@@ -99,6 +99,7 @@ class _UserConfigDiagnostics:
 
     _REPORTED = "reported"
     _PENDING = {"not_evaluated", "compiling", "benchmarking", "running"}
+    _NON_FAILURES = {_REPORTED, "benchmarked", "selected", "skipped_cache_hit", "pruned"}
 
     def __init__(self, configs):
         self.reset_configs(configs)
@@ -133,11 +134,11 @@ class _UserConfigDiagnostics:
             "running": "evaluation_incomplete",
         }
         for config, status, detail in self.results:
-            if status == self._REPORTED:
+            # Keep existing success logs; only add failures and interrupted work.
+            if status in self._NON_FAILURES:
                 continue
             status = incomplete.get(status, status)
-            field = "result" if status in {"benchmarked", "selected", "cache_hit"} else "reason"
-            print(f"Triton autotuning: user config={config}; status={status}; {field}={detail}")
+            print(f"Triton autotuning: config={config}; {status}; reason={detail.strip()}")
 
 
 def _format_autotune_timing(timing) -> str:
@@ -2241,13 +2242,8 @@ class AutoTilingTuner(Autotuner):
                 if self.cache_results:
                     disk_cache_hit = self.check_disk_cache(key, pruned_configs, benchmark)
                     if disk_cache_hit and self._user_config_diagnostics is not None:
-                        self._record_user_timings(self.configs_timings, source="disk_cache")
                         for config in pruned_configs:
-                            if config not in self.configs_timings:
-                                self._record_user_config(
-                                    config, "skipped_cache_hit",
-                                    "Autotune disk cache hit; no timing or failure detail is available for this config."
-                                )
+                            self._record_user_config(config, "skipped_cache_hit")
                 else:
                     benchmark()
 
@@ -2258,16 +2254,8 @@ class AutoTilingTuner(Autotuner):
         else:
             config = self.cache[key]
             if self._user_config_diagnostics is not None:
-                # configs_timings is not keyed by the tuning key. It may belong
-                # to a different invocation, so only report the cached winner.
                 for user_config, _, _ in self._user_config_diagnostics.results:
-                    if user_config == config:
-                        self._record_user_config(user_config, "cache_hit",
-                                                 "Autotune memory cache hit; cached best config; timing unavailable.")
-                    else:
-                        self._record_user_config(
-                            user_config, "skipped_cache_hit",
-                            "Autotune memory cache hit; no per-config timing or failure detail is available.")
+                    self._record_user_config(user_config, "skipped_cache_hit")
 
         self.best_config = config
 
@@ -2949,8 +2937,9 @@ def autotune(configs, key, prune_configs_by=None, reset_to_zero=None, restore_va
     kernel, including the benchmark timing for each valid configuration, the
     time spent autotuning, and the best configuration.
     Additional feedback for user-provided configurations (including hints
-    expansion) explains failures, pruning, and cache hits. Cache hits report
-    only existing information; missing records are reported as skipped.
+    expansion) reports failures or interrupted evaluation without repeating
+    successful benchmark output. Pruning, successful single-config execution,
+    and memory/disk tuning-cache hits do not add diagnostics.
 
     :param configs: a list of :code:`triton.Config` objects
     :type configs: list[triton.Config]
