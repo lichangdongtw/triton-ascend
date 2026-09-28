@@ -226,23 +226,17 @@ If automatic tiling cannot generate any valid candidate configurations, you need
 
 ## Inspecting Feedback for User Configurations
 
-With `TRITON_PRINT_AUTOTUNING=1`, existing autotuning logs are preserved, including rough timings, benchmark results, and compilation-failure cache-hit messages for generated configurations. Additional feedback supplies previously missing timings or reasons for failure, pruning, interruption, and tuning-cache skips. This additional feedback applies only to configurations explicitly supplied in `configs`, including variants expanded through `hints`.
+With `TRITON_PRINT_AUTOTUNING=1`, existing autotuning logs are preserved, including successful benchmark timings and compilation-failure cache-hit messages. Additional diagnostics report failures or interrupted evaluation only for configurations explicitly supplied in `configs`, including variants expanded through `hints`.
 
-| Outcome | Feedback |
-| --- | --- |
-| Benchmark completed | Timing and whether the configuration was selected |
-| Pruned | Known pruning stage or time-budget reason |
-| Compilation or benchmark failed | Failure stage, exception type, and a short error message |
-| Tuning interrupted | Incomplete stage and known interruption reason, without inferring a compilation error |
-| Only one configuration remains and executes successfully | Explanation that no benchmark was needed, without inventing a timing |
+```text
+Triton autotuning: config=BLOCK_SIZE: 64, ...; compile_failed; reason=CompileTimeAssertionFailure: <error message>
+```
 
-Cache hits report only existing information. Diagnostics do not trigger additional compilation or benchmarking:
+The status follows the configuration directly, without a `status=` prefix. Failure feedback includes the known stage, exception type, and a short error message. Incomplete evaluation is identified without guessing that compilation failed. A compilation-failure cache hit retains the existing message with the stored exception type and does not retry compilation.
 
-- The **in-memory tuning cache** stores only the best configuration per key. Feedback identifies that configuration and reports other user configurations as skipped due to the cache hit. Timings from the most recent tuning of another key are not reused.
-- User timings in the **disk tuning cache** are marked `source=disk_cache`. Configurations with no cached record receive `skipped_cache_hit`, without inferring a historical failure.
-- A **compilation-failure cache** hit reports the stored exception type and explains that compilation was not retried.
+No additional feedback is printed for pruning, successful single-config execution, or memory/disk tuning-cache hits. Successful configs keep their existing benchmark output; diagnostics do not add success timings when tuning is interrupted. Actual compilation or execution failures are still reported, including when launching a single or cached selected config.
 
-Feedback does not change cache formats, cache keys, configuration selection, or exception propagation. The selected kernel still executes normally after a tuning-cache hit.
+Diagnostics do not trigger extra compilation or benchmarking, and do not change cache formats, cache keys, configuration selection, or exception propagation.
 
 ## Handwritten `triton.Config` Mode
 
