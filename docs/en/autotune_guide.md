@@ -226,17 +226,13 @@ If automatic tiling cannot generate any valid candidate configurations, you need
 
 ## Inspecting Feedback for User Configurations
 
-With `TRITON_PRINT_AUTOTUNING=1`, existing autotuning logs are preserved, including successful benchmark timings and compilation-failure cache-hit messages. Additional diagnostics report failures or interrupted evaluation only for configurations explicitly supplied in `configs`, including variants expanded through `hints`.
+Set `TRITON_PRINT_AUTOTUNING=1` to view failure and interruption messages for user-provided `configs`, including configurations expanded through `hints`:
 
 ```text
 Triton autotuning: config=BLOCK_SIZE: 64, ...; compile_failed; reason=CompileTimeAssertionFailure: <error message>
 ```
 
-The status follows the configuration directly, without a `status=` prefix. Failure feedback includes the known stage, exception type, and a short error message. Incomplete evaluation is identified without guessing that compilation failed. A compilation-failure cache hit retains the existing message with the stored exception type and does not retry compilation.
-
-No additional feedback is printed for pruning, successful single-config execution, or memory/disk tuning-cache hits. Successful configs keep their existing benchmark output; diagnostics do not add success timings when tuning is interrupted. Actual compilation or execution failures are still reported, including when launching a single or cached selected config.
-
-Diagnostics do not trigger extra compilation or benchmarking, and do not change cache formats, cache keys, configuration selection, or exception propagation.
+Here, `compile_failed` indicates a compilation failure, and `reason` gives the exception type and error message.
 
 ## Handwritten `triton.Config` Mode
 
