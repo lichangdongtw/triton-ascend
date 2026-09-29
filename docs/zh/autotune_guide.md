@@ -221,16 +221,6 @@ Ascend backend 在生成候选时，会结合 NPU 的片上存储容量、对齐
 
 如果自动 Tiling 模式无法生成任何可用候选配置，这时需要用户改为手写 `triton.Config`。同时也建议对这类场景提 issue，帮助 Triton-Ascend 后续补齐解析和自动生成能力。
 
-## 查看用户配置的调优反馈
-
-设置 `TRITON_PRINT_AUTOTUNING=1`，可查看用户配置（`configs`，包括通过 `hints` 展开的配置）的失败和中断信息，例如：
-
-```text
-Triton autotuning: config=BLOCK_SIZE: 64, ...; compile_failed; reason=CompileTimeAssertionFailure: <错误信息>
-```
-
-其中，`compile_failed` 表示编译失败，`reason` 给出异常类型和错误信息。
-
 ## 手写 `triton.Config` 模式
 
 如果自动 Tiling 模式生成失败，或生成的 Tiling 性能未达到预期，直接回到社区标准写法即可。Triton-Ascend 对这部分语义保持兼容：
@@ -253,6 +243,28 @@ def kernel(...):
 - 配置由用户手工提供；
 - 框架负责 benchmark、选择最优配置和缓存复用；
 - 使用习惯与社区 autotune 保持一致。
+
+### 查看调优日志
+
+设置 `TRITON_PRINT_AUTOTUNING=1`，可查看调优日志。实际完成测速后，会打印调优耗时、最佳配置和各个成功配置的测速结果。以下为示意输出（`...` 表示省略的配置参数）：
+
+```text
+Triton autotuning for function kernel finished after 0.12s; best config selected: BLOCK_M: 128, BLOCK_N: 128, ...;
+Triton autotuning benchmark results for function kernel:
+  config=BLOCK_M: 128, BLOCK_N: 128, ...; p50=0.0100 ms, p20=0.0090 ms, p80=0.0110 ms [selected]
+  config=BLOCK_M: 64, BLOCK_N: 256, ...; p50=0.0140 ms, p20=0.0130 ms, p80=0.0150 ms
+```
+
+`[selected]` 标记被选中的最佳配置。`p50`、`p20`、`p80` 分别为第 50、20、80 百分位耗时，单位为毫秒；若测速返回平均耗时，则显示 `mean=... ms`。
+
+用户配置（`configs`，包括通过 `hints` 展开的配置）发生失败，或调优因异常中断时，会打印相应配置的状态和原因。以下分别为编译失败和调优中断的示意输出：
+
+```text
+Triton autotuning: config=BLOCK_M: 128, BLOCK_N: 128, ...; compile_failed; reason=CompileTimeAssertionFailure: <错误信息>
+Triton autotuning: config=BLOCK_M: 64, BLOCK_N: 256, ...; not_evaluated; reason=No benchmark result was produced. Autotuning interrupted: RuntimeError: <错误信息>
+```
+
+其中，`compile_failed` 表示编译失败，`not_evaluated` 表示配置尚未完成评估，`reason` 给出失败或中断原因。
 
 ## 进阶用法：自动 Tiling 与其他参数联合调优
 

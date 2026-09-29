@@ -224,16 +224,6 @@ The goal of this feature is to lower the usage barrier and tuning cost while mak
 
 If automatic tiling cannot generate any valid candidate configurations, you need to switch back to handwritten `triton.Config`. It is also recommended to file an issue for such cases so that Triton-Ascend can improve parsing and automatic-generation coverage later.
 
-## Inspecting Feedback for User Configurations
-
-Set `TRITON_PRINT_AUTOTUNING=1` to view failure and interruption messages for user-provided `configs`, including configurations expanded through `hints`:
-
-```text
-Triton autotuning: config=BLOCK_SIZE: 64, ...; compile_failed; reason=CompileTimeAssertionFailure: <error message>
-```
-
-Here, `compile_failed` indicates a compilation failure, and `reason` gives the exception type and error message.
-
 ## Handwritten `triton.Config` Mode
 
 If automatic tiling fails, or if the generated tiling result does not meet your performance target, you can return directly to the standard community-style handwritten configuration path. Triton-Ascend keeps this part of the interface compatible:
@@ -256,6 +246,28 @@ In this mode:
 - configurations are defined explicitly by the user;
 - the framework still handles benchmarking, best-config selection, and cache reuse;
 - the usage pattern remains consistent with community Triton autotune.
+
+### Inspecting Autotuning Logs
+
+Set `TRITON_PRINT_AUTOTUNING=1` to view autotuning logs. When benchmarking completes, the output shows the tuning time, the best configuration, and the benchmark results for each successful configuration. The following output is illustrative (`...` indicates omitted configuration parameters):
+
+```text
+Triton autotuning for function kernel finished after 0.12s; best config selected: BLOCK_M: 128, BLOCK_N: 128, ...;
+Triton autotuning benchmark results for function kernel:
+  config=BLOCK_M: 128, BLOCK_N: 128, ...; p50=0.0100 ms, p20=0.0090 ms, p80=0.0110 ms [selected]
+  config=BLOCK_M: 64, BLOCK_N: 256, ...; p50=0.0140 ms, p20=0.0130 ms, p80=0.0150 ms
+```
+
+`[selected]` marks the best configuration. `p50`, `p20`, and `p80` are the 50th, 20th, and 80th percentile execution times in milliseconds. If the benchmark returns a mean time, it is shown as `mean=... ms` instead.
+
+If a user-provided configuration (`configs`, including configurations expanded through `hints`) fails, or an exception interrupts autotuning, the logs report the affected configuration's status and reason. The following examples illustrate a compilation failure and interrupted autotuning, respectively:
+
+```text
+Triton autotuning: config=BLOCK_M: 128, BLOCK_N: 128, ...; compile_failed; reason=CompileTimeAssertionFailure: <error message>
+Triton autotuning: config=BLOCK_M: 64, BLOCK_N: 256, ...; not_evaluated; reason=No benchmark result was produced. Autotuning interrupted: RuntimeError: <error message>
+```
+
+Here, `compile_failed` indicates a compilation failure, `not_evaluated` means the configuration's evaluation did not complete, and `reason` describes the failure or interruption.
 
 ## Advanced Usage: Combine Automatic Tiling with Other Tunable Parameters
 
